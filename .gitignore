@@ -1,0 +1,58 @@
+# dependencies (bun install)
+node_modules
+
+# output
+out
+dist
+/packages/client/bundle/
+/packages/client/bundle.next/
+*.tgz
+
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+
+# game files
+files/
+
+# test shard configuratiosn
+test-shards/
+
+# CLI package assets
+/packages/cli/workspace/
+/packages/cli/.github/
+
+# the analyze package (a global ignore may cover folders named analyze)
+!/packages/analyze/
+
+/packages/cli/templates/
+/packages/cli/patches/
+
+# Project licenses copied into contained package artifacts by the build.
+/packages/*/LICENSE
+
+# astro
+.astro

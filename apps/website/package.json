@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@houseguide/website",
+  "description": "Teach your coding agent the house rules.",
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "homepage": "https://houseguide.dev/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/houseguide/houseguide.git",
+    "directory": "apps/website"
+  },
+  "scripts": {
+    "dev": "_",
+    "build": "_"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "wrangler": "4.165.0"
+  }
+}

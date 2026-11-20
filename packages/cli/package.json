@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@houseguide/cli",
+  "description": "Teach your coding agent the house rules.",
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "private": false,
+  "homepage": "https://houseguide.dev/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/houseguide/houseguide.git",
+    "directory": "packages/cli"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "hg": "dist/index.js",
+    "houseguide": "dist/index.js"
+  },
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "build": "rm -rf dist && bun build src/index.ts --outdir dist --target node --external @clack/prompts --external chalk && bun src/prepare-assets.ts"
+  },
+  "dependencies": {
+    "@clack/prompts": "1.9.0",
+    "chalk": "6.0.1"
+  },
+  "devDependencies": {},
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/index.js",
+    "index.d.ts"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

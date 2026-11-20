@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "description": "Teach your coding agent the house rules.",
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://houseguide.dev/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/houseguide/houseguide.git",
+    "directory": "packages/houseguide"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "name": "houseguide",
+  "bin": {
+    "houseguide": "./bin.js",
+    "hg": "./bin.js"
+  },
+  "files": [
+    "bin.js"
+  ],
+  "dependencies": {
+    "@houseguide/cli": "workspace:*"
+  }
+}
