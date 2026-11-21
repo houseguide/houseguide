@@ -1,4 +1,4 @@
-# houseguide
+# ⌂ houseguide
 
 Teach your coding agent the house rules.
 

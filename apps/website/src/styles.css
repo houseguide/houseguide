@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #191816;
+  --color-ink: #f4eee3;
+  --color-muted: #c0b5a7;
+  --color-rule: #4b453d;
+  --color-accent: #f2a181;
+  --color-action: #f2a181;
+  --color-action-hover: #ffc0a7;
+  --color-action-ink: #301a12;
+  --color-terminal: #22201d;
+  --color-terminal-bar: #2c2924;
+  --color-terminal-edge: #665b4d;
+  --color-terminal-rule: #51493e;
+  --color-terminal-ink: #f2e8da;
+  --color-terminal-prompt: #f3aa8d;
+  --font-mono:
+    ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-display: Georgia, "Times New Roman", serif;
+}
