@@ -23,6 +23,7 @@ jobs:
   release:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
+    environment: npm
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -46,4 +47,4 @@ jobs:
           version-script: bun run version-packages
           publish-script: ${{ inputs.publish && 'bun run publish-packages' || '' }}
         env:
-          NODE_AUTH_TOKEN: ${{ inputs.publish && secrets.NPM_TOKEN || '' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
