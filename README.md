@@ -1,8 +1,6 @@
-# houseguide
+# ⌂ houseguide
 
 Teach your coding agent the house rules.
-
-Generate a project-specific `AGENTS.md` from your repository, existing agent instructions, and your directives.
 
 ## Repository layout
 
