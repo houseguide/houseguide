@@ -1,13 +1,14 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "houseguide",
-  "compatibility_date": "2026-11-01",
+  "compatibility_date": "2026-11-19",
   "assets": {
     "directory": "./dist",
     "not_found_handling": "404-page"
   },
   "workers_dev": false,
   "preview_urls": false,
+  "previews": {},
   "observability": {
     "enabled": true,
     "traces": {
