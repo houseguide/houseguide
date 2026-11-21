@@ -8,7 +8,11 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**/*.{ts,tsx,js,jsx,json,jsonc,css}"]
+    "includes": [
+      "**/*.{ts,tsx,js,jsx,json,jsonc,css}",
+
+      "!**/src/routeTree.gen.ts"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -21,10 +25,18 @@
     "enabled": true,
     "domains": {
       "project": "recommended",
+      "react": "recommended",
+      "tailwind": "recommended",
       "types": "recommended"
     },
     "rules": {
-      "preset": "recommended"
+      "preset": "recommended",
+      "nursery": {
+        "useTailwindSortedClasses": {
+          "level": "error",
+          "fix": "safe"
+        }
+      }
     }
   },
   "javascript": {
@@ -43,6 +55,12 @@
     "parser": {
       "tailwindDirectives": true
     }
+  },
+  "tailwind": {
+    "attributes": ["class", "className", "tw"],
+    "mergeFunctions": ["clsx", "cn", "tw"],
+    "variantFunctions": ["cva"],
+    "stylesheet": "apps/website/src/styles.css"
   },
   "json": {
     "formatter": {

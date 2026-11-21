@@ -5,16 +5,19 @@
   "[javascriptreact]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
+  "[typescript]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
   "[json]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
   "[jsonc]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
-  "[typescript]": {
-    "editor.defaultFormatter": "biomejs.biome"
-  },
-  "[typescriptreact]": {
+  "[css]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
   "breadcrumbs.enabled": true,
@@ -40,5 +43,14 @@
   "editor.showUnused": true,
   "emmet.showExpandedAbbreviation": "never",
   "explorer.openEditors.visible": 1,
-  "explorer.compactFolders": false
+  "explorer.compactFolders": false,
+  "files.readonlyInclude": {
+    "**/routeTree.gen.ts": true
+  },
+  "files.watcherExclude": {
+    "**/routeTree.gen.ts": true
+  },
+  "search.exclude": {
+    "**/routeTree.gen.ts": true
+  }
 }
