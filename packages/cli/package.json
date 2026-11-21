@@ -21,22 +21,18 @@
   },
   "scripts": {
     "start": "bun run src/index.ts",
-    "build": "rm -rf dist && bun build src/index.ts --outdir dist --target node --external @clack/prompts --external chalk && bun src/prepare-assets.ts"
+    "build": "bun build src/index.ts src/agents/project-reader.ts --outdir dist --entry-naming '[name].js' --target node --format esm"
   },
-  "dependencies": {
-    "@clack/prompts": "1.9.0",
-    "chalk": "6.0.1"
-  },
-  "devDependencies": {},
   "exports": {
     ".": {
-      "types": "./index.d.ts",
       "default": "./dist/index.js"
     }
   },
   "files": [
     "dist/index.js",
-    "index.d.ts"
+    "dist/project-reader.js",
+    "catalog/instructions.md",
+    "catalog/structure.md"
   ],
   "publishConfig": {
     "access": "public"

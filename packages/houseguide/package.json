@@ -25,6 +25,6 @@
     "bin.js"
   ],
   "dependencies": {
-    "@houseguide/cli": "workspace:*"
+    "@houseguide/cli": "0.0.0"
   }
 }

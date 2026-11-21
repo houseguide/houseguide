@@ -1,4 +1,4 @@
-# houseguide
+# ⌂ houseguide
 
 Teach your coding agent the house rules.
 
@@ -7,12 +7,19 @@ Teach your coding agent the house rules.
 ## Usage
 
 ```sh
-npm install --global houseguide
-houseguide --help
+npx houseguide --help
 ```
 
 ```text
-# TODO: OUTPUT OF THE HELP COMMAND WILL COME HERE
+Usage: ⌂ houseguide [options]
+
+Options
+  -m, --model <provider/model>  Select the agent and model
+  -p, --prompt <text>           Add instructions for the agent
+  -y, --yes                     Approve writing the generated draft
+  -o, --output <file>           Write to this path (default: AGENTS.md)
+  -h, --help                    Show help
+  -v, --version                 Show the version
 ```
 
 ## License
