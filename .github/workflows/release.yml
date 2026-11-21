@@ -4,11 +4,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      publish:
-        description: Publish versioned packages to npm
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -46,6 +41,6 @@ jobs:
       - uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
           version-script: bun run version-packages
-          publish-script: ${{ inputs.publish && 'bun run publish-packages' || '' }}
+          publish-script: bun run publish-packages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
