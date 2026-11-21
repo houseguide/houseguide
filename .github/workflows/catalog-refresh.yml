@@ -1,0 +1,128 @@
+name: Refresh catalog
+
+on:
+  schedule:
+    - cron: "37 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      cutoff:
+        description: Minimum repository stars
+        type: number
+        default: 1000
+
+permissions: {}
+
+concurrency:
+  group: catalog-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    permissions:
+      actions: read
+      contents: read
+      copilot-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+          no-cache: true
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Install Copilot CLI
+        run: npm install --global @github/copilot@1.0.114
+
+      - name: Restore catalog state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/catalog/refresh/restore.ts out/catalog-refresh/state
+
+      - name: Refresh catalog
+        timeout-minutes: 330
+        env:
+          CATALOG_CUTOFF: ${{ github.event_name == 'schedule' && 1000 || inputs.cutoff }}
+          CATALOG_GITHUB_TOKEN: ${{ secrets.CATALOG_GITHUB_TOKEN || github.token }}
+          CATALOG_INFERENCE_PROVIDER: ${{ vars.CATALOG_INFERENCE_PROVIDER || 'copilot' }}
+          CATALOG_INFERENCE_MODEL: ${{ vars.CATALOG_INFERENCE_MODEL || 'auto' }}
+          CATALOG_INFERENCE_TOKEN: ${{ secrets.CATALOG_INFERENCE_TOKEN || github.token }}
+        run: bun scripts/catalog/refresh/run.ts --cutoff "$CATALOG_CUTOFF"
+
+      - name: Save catalog state
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: catalog-state-${{ github.run_id }}-${{ github.run_attempt }}
+          path: out/catalog-refresh/state/
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Upload validated guides
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: catalog-guides-${{ github.run_id }}
+          path: out/catalog-refresh/guides/*.md
+          if-no-files-found: error
+          overwrite: true
+
+  propose-update:
+    needs: refresh
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: catalog-guides-${{ github.run_id }}
+          path: out/catalog-refresh/guides
+
+      - name: Prepare guides and patch changeset
+        id: prepare
+        run: |
+          cp out/catalog-refresh/guides/instructions.md packages/cli/catalog/instructions.md
+          cp out/catalog-refresh/guides/structure.md packages/cli/catalog/structure.md
+          if git diff --quiet -- packages/cli/catalog/instructions.md packages/cli/catalog/structure.md; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          cat > .changeset/weekly-catalog-refresh.md <<'CHANGESET'
+          ---
+          "@houseguide/cli": patch
+          ---
+
+          Refresh the bundled instruction catalog and structure guide from active public repository sources.
+          CHANGESET
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update catalog pull request
+        if: steps.prepare.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
+        with:
+          branch: automation/catalog-refresh
+          base: main
+          title: Refresh the bundled instruction catalog
+          commit-message: Refresh the bundled instruction catalog
+          body: |
+            Updates the CLI's instruction catalog and structure guide from the weekly refresh.
+            Includes a patch changeset for the scoped CLI.
+          add-paths: |
+            packages/cli/catalog/instructions.md
+            packages/cli/catalog/structure.md
+            .changeset/weekly-catalog-refresh.md
