@@ -1,5 +1,11 @@
 # @houseguide/cli
 
+## 0.2.0
+
+### Minor Changes
+
+- Show a progress spinner on stderr while the agent drafts, and run provider processes asynchronously.
+
 ## 0.1.0
 
 ### Minor Changes

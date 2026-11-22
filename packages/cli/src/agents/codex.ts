@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,8 +5,9 @@ import { execPath } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { type AgentResponse, agentResponseSchema, validateDraft } from '../response.ts';
+import { runProcess } from './run.ts';
 
-export function runCodex(projectRoot: string, prompt: string, model?: string): AgentResponse {
+export async function runCodex(projectRoot: string, prompt: string, model?: string): Promise<AgentResponse> {
   const directory = mkdtempSync(join(tmpdir(), 'houseguide-codex-'));
 
   try {
@@ -62,16 +62,8 @@ export function runCodex(projectRoot: string, prompt: string, model?: string): A
     }
     args.push('-');
 
-    const result = spawnSync('codex', args, {
-      cwd: projectRoot,
-      encoding: 'utf8',
-      input: prompt,
-      stdio: ['pipe', 'ignore', 'ignore']
-    });
+    const result = await runProcess('codex', args, { cwd: projectRoot, input: prompt, capture: false });
 
-    if (result.error) {
-      throw result.error;
-    }
     if (result.status !== 0) {
       throw new Error(`Codex exited with ${result.signal ?? `status ${result.status}`}.`);
     }

@@ -13,6 +13,7 @@ import { parseOptions } from './options.ts';
 import { resolveDestination, resolveProjectRoot } from './project.ts';
 import { buildGenerationPrompt } from './prompt.ts';
 import { readDestination } from './review.ts';
+import { createSpinner } from './spinner.ts';
 
 function askTerminal(message: string): Promise<string> {
   return new Promise((resolve) => {
@@ -40,7 +41,14 @@ try {
     const { provider, model } = await selectAgent(options.model, ask);
     const prompt = buildGenerationPrompt(projectRoot, options.prompt);
     const runAgent = provider === 'codex' ? runCodex : runClaude;
-    const draft = runAgent(projectRoot, prompt, model);
+    const spinner = createSpinner(process.stderr);
+    spinner.start(`Drafting ${model === undefined ? provider : `${provider}/${model}`}`);
+    let draft: Awaited<ReturnType<typeof runAgent>>;
+    try {
+      draft = await runAgent(projectRoot, prompt, model);
+    } finally {
+      spinner.stop();
+    }
     await deliverDraft(draft, destination, previous, {
       yes: options.yes,
       stdout: process.stdout,

@@ -1,6 +1,5 @@
-import { spawnSync } from 'node:child_process';
-
 import { type AgentResponse, agentResponseSchema, validateDraft } from '../response.ts';
+import { runProcess } from './run.ts';
 
 interface ClaudeResult {
   is_error?: boolean;
@@ -8,7 +7,7 @@ interface ClaudeResult {
   structured_output?: unknown;
 }
 
-export function runClaude(projectRoot: string, prompt: string, model?: string): AgentResponse {
+export async function runClaude(projectRoot: string, prompt: string, model?: string): Promise<AgentResponse> {
   const args = [
     '--print',
     '--output-format',
@@ -29,11 +28,7 @@ export function runClaude(projectRoot: string, prompt: string, model?: string): 
     args.push(`--model=${model}`);
   }
 
-  const result = spawnSync('claude', args, { cwd: projectRoot, encoding: 'utf8', input: prompt });
-
-  if (result.error) {
-    throw result.error;
-  }
+  const result = await runProcess('claude', args, { cwd: projectRoot, input: prompt });
 
   let response: ClaudeResult;
   try {

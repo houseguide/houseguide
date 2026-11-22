@@ -31,7 +31,3 @@ Houseguide is a CLI that inspects a project and drafts an `AGENTS.md` for its co
 
 - Add a Changeset for substantive publishable package changes using `bun changeset`. Name the publishable package whose behavior changed. Catalog refresh automation supplies the scoped CLI patch changeset when it proposes updated guides.
 - Leave versioning and publication to the **Release** workflow. A push to `main` can update the version PR. Publishing requires an authorized operator to dispatch the workflow on `main` with `publish` enabled after the version PR has merged.
-
-## Documentation lookup
-
-- For questions about a library, framework, SDK, API, CLI tool, or cloud service, use Context7 for current documentation. Resolve the official name with `npx ctx7@latest library <name> "<query>"` unless the operator supplied a library ID, then use `npx ctx7@latest docs <libraryId> "<query>"` for the relevant concept. Keep requests within three commands per question, omit secrets from queries, and use the authorized environment outside the default sandbox. If the quota is exhausted, report it and mention `npx ctx7@latest login` or `CONTEXT7_API_KEY`.
