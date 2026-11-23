@@ -212,16 +212,17 @@ describe('model, agent, and effort selection', () => {
   });
 });
 
-test('both package READMEs show the exact help output', () => {
-  for (const [name, executable] of [
-    ['cli', entry],
-    ['houseguide', join(root, 'packages/houseguide/bin.js')]
-  ] as const) {
-    const result = command('node', [executable, '--help'], root);
-    expect(result.status, result.stderr).toBe(0);
-    const readme = readFileSync(join(root, 'packages', name, 'README.md'), 'utf8');
-    expect(readme).toContain(`\`\`\`text\n${result.stdout}\`\`\``);
+test('every copy of the help matches the executable output', () => {
+  const help = command('node', [entry, '--help'], root);
+  expect(help.status, help.stderr).toBe(0);
+  const wrapper = command('node', [join(root, 'packages/houseguide/bin.js'), '--help'], root);
+  expect(wrapper.stdout).toBe(help.stdout);
+
+  for (const readme of ['README.md', 'packages/cli/README.md', 'packages/houseguide/README.md']) {
+    expect(readFileSync(join(root, readme), 'utf8')).toContain(`\`\`\`text\n${help.stdout}\`\`\``);
   }
+  const website = readFileSync(join(root, 'apps/website/src/routes/index.tsx'), 'utf8');
+  expect(website).toContain(`const help = \`${help.stdout.trimEnd()}\`;`);
 });
 
 test('offline tarball installs expose both aliases under Node and Bun', () => {
