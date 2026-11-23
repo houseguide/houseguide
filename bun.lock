@@ -44,7 +44,7 @@
     },
     "packages/cli": {
       "name": "@houseguide/cli",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "bin": {
         "hg": "dist/index.js",
         "houseguide": "dist/index.js",
@@ -52,13 +52,13 @@
     },
     "packages/houseguide": {
       "name": "houseguide",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "bin": {
         "houseguide": "./bin.js",
         "hg": "./bin.js",
       },
       "dependencies": {
-        "@houseguide/cli": "0.2.0",
+        "@houseguide/cli": "0.3.0",
       },
     },
   },
