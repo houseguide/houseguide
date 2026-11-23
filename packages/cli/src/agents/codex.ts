@@ -7,7 +7,12 @@ import { fileURLToPath } from 'node:url';
 import { type AgentResponse, agentResponseSchema, validateDraft } from '../response.ts';
 import { runProcess } from './run.ts';
 
-export async function runCodex(projectRoot: string, prompt: string, model?: string): Promise<AgentResponse> {
+export async function runCodex(
+  projectRoot: string,
+  prompt: string,
+  model?: string,
+  effort?: string
+): Promise<AgentResponse> {
   const directory = mkdtempSync(join(tmpdir(), 'houseguide-codex-'));
 
   try {
@@ -59,6 +64,9 @@ export async function runCodex(projectRoot: string, prompt: string, model?: stri
 
     if (model !== undefined) {
       args.push(`--model=${model}`);
+    }
+    if (effort !== undefined) {
+      args.push('-c', `model_reasoning_effort=${JSON.stringify(effort)}`);
     }
     args.push('-');
 

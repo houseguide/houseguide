@@ -7,7 +7,12 @@ interface ClaudeResult {
   structured_output?: unknown;
 }
 
-export async function runClaude(projectRoot: string, prompt: string, model?: string): Promise<AgentResponse> {
+export async function runClaude(
+  projectRoot: string,
+  prompt: string,
+  model?: string,
+  effort?: string
+): Promise<AgentResponse> {
   const args = [
     '--print',
     '--output-format',
@@ -26,6 +31,9 @@ export async function runClaude(projectRoot: string, prompt: string, model?: str
   ];
   if (model !== undefined) {
     args.push(`--model=${model}`);
+  }
+  if (effort !== undefined) {
+    args.push(`--effort=${effort}`);
   }
 
   const result = await runProcess('claude', args, { cwd: projectRoot, input: prompt });

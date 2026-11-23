@@ -6,6 +6,7 @@ import { createInterface } from 'node:readline';
 import { version } from '../package.json';
 import { runClaude } from './agents/claude.ts';
 import { runCodex } from './agents/codex.ts';
+import { runCommandCode } from './agents/command-code.ts';
 import { selectAgent } from './agents/select.ts';
 import { deliverDraft } from './deliver.ts';
 import { help } from './help.ts';
@@ -38,14 +39,16 @@ try {
     const destination = resolveDestination(projectRoot, invocationDirectory, options.output);
     const previous = readDestination(destination);
     const ask = process.stdin.isTTY && process.stdout.isTTY && process.stderr.isTTY ? askTerminal : undefined;
-    const { provider, model } = await selectAgent(options.model, ask);
+    const { provider, model, effort } = await selectAgent(options, ask);
     const prompt = buildGenerationPrompt(projectRoot, options.prompt);
-    const runAgent = provider === 'codex' ? runCodex : runClaude;
+    const runAgent = { codex: runCodex, claude: runClaude, cmd: runCommandCode }[provider];
     const spinner = createSpinner(process.stderr);
-    spinner.start(`Drafting ${model === undefined ? provider : `${provider}/${model}`}`);
+    spinner.start(
+      `Drafting ${model === undefined ? provider : `${provider}/${model}`}${effort === undefined ? '' : ` (${effort} effort)`}`
+    );
     let draft: Awaited<ReturnType<typeof runAgent>>;
     try {
-      draft = await runAgent(projectRoot, prompt, model);
+      draft = await runAgent(projectRoot, prompt, model, effort);
     } finally {
       spinner.stop();
     }

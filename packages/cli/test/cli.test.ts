@@ -34,8 +34,23 @@ const fixtureAgent = `#!/usr/bin/env node
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const argv = process.argv.slice(2);
+if (argv[0] === '--version') {
+  console.log('fixture');
+  process.exit(0);
+}
+if (process.env.HOUSEGUIDE_FIXTURE_ARGV) {
+  fs.writeFileSync(process.env.HOUSEGUIDE_FIXTURE_ARGV, JSON.stringify(argv));
+}
 const prompt = fs.readFileSync(0, 'utf8');
 const input = JSON.parse(prompt.slice(prompt.lastIndexOf('\\n\\n') + 2));
+if (argv.includes('--add-dir')) {
+  assert.notEqual(input.projectRoot, process.cwd());
+  const settings = JSON.parse(fs.readFileSync('.commandcode/settings.json', 'utf8'));
+  assert.deepEqual(settings, {permissions: {additionalDirectories: [input.projectRoot], allow: ['Read(' + input.projectRoot + '/**)']}});
+  assert.ok(argv.includes('--safe-mode') && argv.includes('--no-skills') && !argv.includes('--yolo'));
+  assert.match(prompt, /Reply with only one JSON object/);
+  process.chdir(argv[argv.indexOf('--add-dir') + 1]);
+}
 assert.equal(input.projectRoot, process.cwd());
 assert.match(input.instructionCatalog, /Reusable instruction catalog/);
 assert.match(input.structureGuide, /Instruction file structure/);
@@ -53,6 +68,10 @@ const response = {
 if (argv.includes('exec')) {
   assert.ok(argv.includes('read-only') && argv.includes('shell_tool'));
   fs.writeFileSync(argv[argv.indexOf('--output-last-message') + 1], JSON.stringify(response));
+} else if (argv.includes('--add-dir')) {
+  const finalText = 'Draft:\\n\\x60\\x60\\x60json\\n' + JSON.stringify(response) + '\\n\\x60\\x60\\x60';
+  console.log(JSON.stringify({type: 'event', event: {type: 'tool_running', toolName: 'read_file'}}));
+  console.log(JSON.stringify({type: 'result', subtype: 'success', finalText}));
 } else {
   assert.ok(argv.includes('Read,Glob,Grep'));
   console.log(JSON.stringify({structured_output: response}));
@@ -63,7 +82,7 @@ beforeAll(() => {
   const build = command('bun', ['run', 'prepare-release'], root);
   expect(build.status, build.stderr).toBe(0);
   mkdirSync(bin);
-  for (const agent of ['codex', 'claude']) {
+  for (const agent of ['codex', 'claude', 'command-code']) {
     const fixture = join(bin, agent);
     writeFileSync(fixture, fixtureAgent);
     chmodSync(fixture, 0o755);
@@ -74,7 +93,8 @@ afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
 for (const [agent, runtime] of [
   ['codex', 'node'],
-  ['claude', 'bun']
+  ['claude', 'bun'],
+  ['cmd', 'node']
 ] as const) {
   describe(agent, () => {
     function run(directory: string, ...args: string[]) {
@@ -125,6 +145,72 @@ for (const [agent, runtime] of [
     });
   });
 }
+
+describe('model, agent, and effort selection', () => {
+  function select(...args: string[]) {
+    const directory = mkdtempSync(join(scratch, 'select-'));
+    const log = join(directory, '..', `${directory.split('/').at(-1)}.argv.json`);
+    const result = command('node', [entry, '-p', 'Use calibration log.', ...args], directory, {
+      ...env,
+      PATH: [bin, env.PATH].join(delimiter),
+      HOUSEGUIDE_FIXTURE_ARGV: log
+    });
+    return { ...result, argv: existsSync(log) ? (JSON.parse(readFileSync(log, 'utf8')) as string[]) : [] };
+  }
+
+  test('passes the bare model and effort to Codex for an openai model', () => {
+    const result = select('-a', 'codex', '-m', 'openai/fixture', '-e', 'high');
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.argv).toContain('--model=fixture');
+    expect(result.argv).toContain('model_reasoning_effort="high"');
+  });
+
+  test('passes the bare model and effort to Claude Code for an anthropic model', () => {
+    const result = select('-a', 'claude', '-m', 'anthropic/fixture', '-e', 'max');
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.argv).toContain('--model=fixture');
+    expect(result.argv).toContain('--effort=max');
+  });
+
+  test('passes lab/model to Command Code', () => {
+    const result = select('-a', 'cmd', '-m', 'deepseek/fixture', '-e', 'low');
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.argv).toContain('--model=deepseek/fixture');
+    expect(result.argv).toContain('--effort=low');
+  });
+
+  test('picks the only harness that runs the lab and leaves effort to it', () => {
+    const result = select('-m', 'deepseek/fixture');
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.argv).toContain('--model=deepseek/fixture');
+    expect(result.argv.some((arg) => arg.includes('effort'))).toBe(false);
+  });
+
+  test('keeps the harness shorthand working', () => {
+    const result = select('-m', 'claude/fixture');
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.argv).toContain('--model=fixture');
+  });
+
+  test('requires --agent when several harnesses run the lab without a terminal', () => {
+    const result = select('-m', 'openai/fixture');
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Specify --agent with codex, cmd.');
+  });
+
+  test('rejects a harness that does not run the lab', () => {
+    const result = select('-a', 'claude', '-m', 'openai/fixture');
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Claude Code does not run openai models.');
+  });
+
+  test('rejects an effort that is not a single level', () => {
+    const result = select('-a', 'claude', '-e', 'high max');
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('--effort');
+    expect(result.argv).toEqual([]);
+  });
+});
 
 test('both package READMEs show the exact help output', () => {
   for (const [name, executable] of [

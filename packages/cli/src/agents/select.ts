@@ -2,44 +2,110 @@ import { spawn, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { createInterface } from 'node:readline';
 
-const providers = ['codex', 'claude'] as const;
-export type Provider = (typeof providers)[number];
-type AgentSelection = { provider: Provider; model?: string };
+// Labs that a harness runs natively. Command Code hosts many labs, so it accepts any.
+const agents = {
+  codex: { name: 'Codex', executable: 'codex', labs: ['openai'], install: 'https://developers.openai.com/codex/cli/' },
+  claude: {
+    name: 'Claude Code',
+    executable: 'claude',
+    labs: ['anthropic'],
+    install: 'https://code.claude.com/docs/en/setup'
+  },
+  cmd: { name: 'Command Code', executable: 'command-code', labs: undefined, install: 'https://commandcode.ai/docs' }
+} as const satisfies Record<string, { name: string; executable: string; labs?: readonly string[]; install: string }>;
+export type Provider = keyof typeof agents;
+const providers = Object.keys(agents) as Provider[];
+
+export interface AgentRequest {
+  agent?: string;
+  model?: string;
+  effort?: string;
+}
+export interface AgentSelection {
+  provider: Provider;
+  model?: string;
+  effort?: string;
+}
+
+function isProvider(value: string): value is Provider {
+  return (providers as string[]).includes(value);
+}
+
+function runs(provider: Provider, lab: string | undefined): boolean {
+  const labs: readonly string[] | undefined = agents[provider].labs;
+  return lab === undefined || labs === undefined || labs.includes(lab);
+}
 
 export async function selectAgent(
-  selection: string | undefined,
+  { agent: requested, model, effort }: AgentRequest,
   ask?: (message: string) => Promise<string>
 ): Promise<AgentSelection> {
-  if (selection !== undefined) {
-    const slash = selection.indexOf('/');
-    const provider = providers.find((candidate) => candidate === selection.slice(0, slash));
-    const model = selection.slice(slash + 1);
-    if (slash < 1 || !provider || !model.trim()) {
-      throw new Error('Use --model with codex/<model> or claude/<model>.');
-    }
-    return { provider, model };
+  if (requested !== undefined && !isProvider(requested)) {
+    throw new Error(`Use --agent with ${providers.join(', ')}.`);
+  }
+  let agent: Provider | undefined = requested;
+  if (model !== undefined && !model.trim()) {
+    throw new Error('Use --model with <lab/model>, such as openai/<model>, or a model name.');
   }
 
-  const available = providers.filter(
-    (provider) => spawnSync(provider, ['--version'], { stdio: 'ignore', timeout: 3000 }).status === 0
-  );
-  let [provider] = available;
-  if (!provider) {
-    throw new Error(
-      'Install Codex (https://developers.openai.com/codex/cli/) or Claude Code (https://code.claude.com/docs/en/setup).'
+  // A harness name in front of the model is the shorthand for --agent.
+  let lab: string | undefined;
+  let slash = model?.indexOf('/') ?? -1;
+  if (model !== undefined && slash > 0 && isProvider(model.slice(0, slash))) {
+    const named: Provider = model.slice(0, slash) as Provider;
+    if (agent !== undefined && agent !== named) {
+      throw new Error(`--model names ${named} but --agent names ${agent}.`);
+    }
+    agent = named;
+    model = model.slice(slash + 1);
+    if (!model.trim()) {
+      throw new Error(`Use --model with ${named}/<model>.`);
+    }
+    slash = model.indexOf('/');
+  }
+  if (model !== undefined && slash > 0) {
+    lab = model.slice(0, slash);
+  }
+
+  let provider: Provider;
+  if (agent !== undefined) {
+    provider = agent;
+    if (!runs(provider, lab)) {
+      throw new Error(`${agents[provider].name} does not run ${lab} models.`);
+    }
+  } else {
+    const candidates = providers.filter((name) => runs(name, lab));
+    const available = candidates.filter(
+      (name) => spawnSync(agents[name].executable, ['--version'], { stdio: 'ignore', timeout: 3000 }).status === 0
     );
-  }
-  if (available.length > 1) {
-    if (!ask) {
-      throw new Error('Multiple agents are installed. Specify --model <provider/model>.');
+    const [first] = available;
+    if (!first) {
+      const install = candidates.map((name) => `${agents[name].name} (${agents[name].install})`).join(', ');
+      throw new Error(lab === undefined ? `Install ${install}.` : `To run ${lab} models, install ${install}.`);
     }
-    const answer = (await ask('Choose an agent (1 for Codex, 2 for Claude): ')).trim();
-    if (answer !== '1' && answer !== '2') {
-      throw new Error('Select 1 for Codex or 2 for Claude.');
+    provider = first;
+    if (available.length > 1) {
+      if (!ask) {
+        throw new Error(`Multiple agents can run this model. Specify --agent with ${available.join(', ')}.`);
+      }
+      const choices = available.map((name, index) => `${index + 1} for ${agents[name].name}`).join(', ');
+      const answer = (await ask(`Choose an agent (${choices}): `)).trim();
+      const chosen = /^[1-9]$/.test(answer) ? available[Number(answer) - 1] : undefined;
+      if (!chosen) {
+        throw new Error(`Select ${choices}.`);
+      }
+      provider = chosen;
     }
-    provider = answer === '1' ? 'codex' : 'claude';
   }
-  return { provider, model: provider === 'codex' ? await readCodexModel() : undefined };
+
+  // Codex and Claude Code take the bare model name; Command Code takes lab/model.
+  if (model !== undefined && lab !== undefined && agents[provider].labs !== undefined) {
+    model = model.slice(slash + 1);
+  }
+  if (model === undefined && provider === 'codex') {
+    model = await readCodexModel();
+  }
+  return { provider, model, effort };
 }
 
 function readCodexModel(): Promise<string | undefined> {

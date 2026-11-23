@@ -18,7 +18,9 @@ npx houseguide --yes # or to generate AGENTS.md directly
 Usage: ⌂ houseguide [options]
 
 Options
-  -m, --model <provider/model>  Select the agent and model
+  -m, --model <lab/model>       Select the model, such as openai/<model>
+  -a, --agent <agent>           Run with codex, claude, or cmd
+  -e, --effort <level>          Set the agent's reasoning effort
   -p, --prompt <text>           Add instructions for the agent
   -y, --yes                     Approve writing the generated draft
   -o, --output <file>           Write to this path (default: AGENTS.md)
@@ -26,21 +28,37 @@ Options
   -v, --version                 Show the version
 ```
 
-### `-m, --model <provider/model>`
+### `-m, --model <lab/model>`
 
-Selects the coding agent and model used to write the draft.
+Selects the model that writes the draft, named by the lab that made it, then the model.
 
-- Currently, it supports `claude` and `codex` as providers, PRs welcome to support more in the future.
-- Everything after the first slash is passed verbatim to that provider's CLI as its model. It's highly forgiving but you can go as specific as needed. `claude/opus` would work with the default Opus version, but `claude/claude-opus-5-5` would only use Opus 5.5.
-- When you omit `--model`, Houseguide probes each provider with `--version`:
-  - One installed provider is used automatically, with its own configured default model. For Codex, Houseguide reads the configured model from `codex app-server`; for Claude, it lets Claude Code choose.
-  - Both installed: Houseguide asks which one to use, but only when stdin, stdout, and stderr are all terminals. Otherwise it exits with an error so a pipeline never blocks on a prompt.
-  - Neither installed: it exits with links to the install instructions.
+- `openai/<model>` runs on Codex or Command Code, `anthropic/<model>` on Claude Code or Command Code, and any other lab, such as `deepseek/<model>`, on Command Code.
+- Codex and Claude Code receive the model name without the lab; Command Code receives `lab/model`. The name is passed verbatim, so `anthropic/opus` uses the default Opus version and `anthropic/claude-opus-5-5` only Opus 5.5.
+- A model without a lab, such as `-m opus`, is passed to whichever agent runs.
+- An agent name in front is a shorthand for `--agent`: `codex/<model>`, `claude/<model>`, and `cmd/<lab>/<model>` keep working.
 
-Example:
+### `-a, --agent <agent>`
+
+Selects the coding agent that runs the model: `codex`, `claude`, or `cmd` (Command Code). PRs welcome to support more.
+
+It's called an agent rather than a harness because that's how these tools describe themselves, and `-h` is already `--help`.
+
+When you omit it, Houseguide probes the agents that can run the model with `--version`:
+
+- One installed agent is used automatically. Without `--model`, it uses its own configured default: for Codex, Houseguide reads the configured model from `codex app-server`; Claude Code and Command Code choose their own.
+- Several installed: Houseguide asks which one to use, but only when stdin, stdout, and stderr are all terminals. Otherwise it exits with an error so a pipeline never blocks on a prompt.
+- None installed: it exits with links to the install instructions.
+
+### `-e, --effort <level>`
+
+Sets the agent's reasoning effort, such as `low`, `medium`, `high`, or `max`. The level is passed to the agent as-is, because the supported levels depend on the agent and model. Without it, the agent uses its configured default.
+
+Every option is independent, so use as many as you need:
 
 ```sh
-npx houseguide --model claude/fable --yes
+npx houseguide --model openai/gpt-6.2-astra --yes
+npx houseguide --model deepseek/deepseek-v4.1-flash --effort high --yes
+npx houseguide --agent cmd --model anthropic/claude-opus-5-5 --yes
 ```
 
 ### `-p, --prompt <text>`
@@ -110,6 +128,7 @@ The guide is generated under restrictions, not under the agent's normal permissi
 
 - Claude Code runs with only `Read`, `Glob`, and `Grep`, no MCP servers, no session persistence, and a restricted permission mode.
 - Codex runs in a read-only sandbox with shell execution, plugins, hooks, web search, and user configuration disabled. It reads the project through a project-reader MCP server confined to the resolved project root, including through symlinks.
+- Command Code runs headless, where shell and write tools are withheld, with mods and skills disabled and no session persistence. It starts in an empty directory whose only settings grant reads under the project root, so the project's own `.commandcode/` settings, hooks, and `.mcp.json` servers never load. Your user-level Command Code settings still apply.
 - Collected project content is treated as evidence for the draft. It cannot authorize command execution, edits, or extra tools.
 
 ## Repository layout
@@ -124,6 +143,7 @@ The monorepo uses Bun for development and builds. The CLI targets Node.js and Bu
 
 - [x] Claude Code
 - [x] Codex
+- [x] Command Code
 - [ ] PRs welcome for more providers
 
 ## License
