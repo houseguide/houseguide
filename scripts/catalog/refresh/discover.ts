@@ -6,7 +6,6 @@ import { type GitHubRequest, githubRequest } from './github.ts';
 export const minimumCutoff = 1000;
 const searchLimit = 1000;
 const pageSize = 100;
-const paginationAttempts = 5;
 
 export interface Repository {
   id: number;
@@ -21,6 +20,11 @@ interface SearchResult {
   items: { id: number; full_name: string; default_branch: string; stargazers_count: number; private: boolean }[];
 }
 
+interface Window {
+  stars: [number, number?];
+  created?: [number, number];
+}
+
 export function parseCutoff(input?: string): number {
   const cutoff = Number(input ?? minimumCutoff);
   if (!Number.isSafeInteger(cutoff) || cutoff < minimumCutoff) {
@@ -33,66 +37,84 @@ function timestamp(seconds: number): string {
   return new Date(seconds * 1000).toISOString().replace('.000Z', 'Z');
 }
 
-export async function discoverRepositories(request: GitHubRequest, cutoff = minimumCutoff): Promise<Repository[]> {
+function describe({ stars: [min, max], created }: Window): string {
+  const stars = max === undefined ? `stars:>=${min}` : `stars:${min}..${max}`;
+  return created ? `${stars} created:${timestamp(created[0])}..${timestamp(created[1])}` : stars;
+}
+
+// GitHub search serves at most 1000 results per query, so split by star band, and by creation
+// date only when a single star count still exceeds the cap. Counts and pages drift while stars
+// change, so discovery is best effort: it deduplicates what it sees and reports any shortfall
+// instead of failing the refresh.
+export async function discoverRepositories(
+  request: GitHubRequest,
+  cutoff = minimumCutoff,
+  log: (message: string) => void = (message) => console.error(message)
+): Promise<Repository[]> {
   parseCutoff(String(cutoff));
   const repositories = new Map<number, Repository>();
+  let reported = 0;
 
-  async function visit(first: number, last: number): Promise<void> {
-    const query = new URLSearchParams({
-      q: `is:public fork:true stars:>=${cutoff} created:${timestamp(first)}..${timestamp(last)}`,
-      sort: 'stars',
-      order: 'desc',
-      per_page: String(pageSize)
-    });
+  async function visit(window: Window): Promise<void> {
+    const query = new URLSearchParams({ q: `is:public fork:true ${describe(window)}`, per_page: String(pageSize) });
     const search = async (page: number) => {
       query.set('page', String(page));
       return request<SearchResult>(`/search/repositories?${query}`);
     };
 
     const initial = await search(1);
-    if (initial.incomplete_results || initial.total_count > searchLimit) {
-      if (first === last) {
-        throw new Error(`GitHub search could not enumerate repositories created at ${timestamp(first)}.`);
+    const total = initial.total_count;
+    if (total > searchLimit) {
+      const [min, max] = window.stars;
+      if (max === undefined) {
+        await visit({ stars: [min, min * 2 - 1] });
+        await visit({ stars: [min * 2] });
+        return;
       }
-      const middle = Math.floor((first + last) / 2);
-      await visit(first, middle);
-      await visit(middle + 1, last);
-      return;
+      if (max > min) {
+        const middle = Math.floor((min + max) / 2);
+        await visit({ stars: [min, middle] });
+        await visit({ stars: [middle + 1, max] });
+        return;
+      }
+      const [first, last] = window.created ?? [0, Math.floor(Date.now() / 1000)];
+      if (first < last) {
+        const middle = Math.floor((first + last) / 2);
+        await visit({ stars: window.stars, created: [first, middle] });
+        await visit({ stars: window.stars, created: [middle + 1, last] });
+        return;
+      }
+      log(`Discovery: ${describe(window)} has ${total} results; keeping the first ${searchLimit}.`);
     }
 
-    // Results are sorted by stars, which change while we paginate, so a page can shift and
-    // repeat or skip a repository. Refetch the whole window until one pass is consistent.
-    let items = initial.items;
-    for (let attempt = 1; ; attempt++) {
-      const first = attempt === 1 ? initial : await search(1);
-      items = [...first.items];
-      const total = first.total_count;
-      let consistent = !first.incomplete_results && total <= searchLimit;
-      for (let page = 2; consistent && page <= Math.ceil(total / pageSize); page++) {
-        const result = await search(page);
-        consistent = !result.incomplete_results && result.total_count === total;
-        items.push(...result.items);
-      }
-      if (consistent && new Set(items.map(({ id }) => id)).size === total) {
-        break;
-      }
-      if (attempt === paginationAttempts) {
-        throw new Error('GitHub search kept changing during pagination. Retry the refresh.');
+    const wanted = Math.min(total, searchLimit);
+    const seen = new Set<number>();
+    let incomplete = initial.incomplete_results;
+    for (let page = 1; page <= Math.ceil(wanted / pageSize); page++) {
+      const result = page === 1 ? initial : await search(page);
+      incomplete ||= result.incomplete_results;
+      for (const item of result.items) {
+        seen.add(item.id);
+        if (!item.private && item.stargazers_count >= cutoff) {
+          repositories.set(item.id, {
+            id: item.id,
+            name: item.full_name,
+            defaultBranch: item.default_branch,
+            stars: item.stargazers_count
+          });
+        }
       }
     }
-    for (const item of items) {
-      if (!item.private && item.stargazers_count >= cutoff) {
-        repositories.set(item.id, {
-          id: item.id,
-          name: item.full_name,
-          defaultBranch: item.default_branch,
-          stars: item.stargazers_count
-        });
-      }
+    reported += wanted;
+    if (incomplete || seen.size < wanted) {
+      log(
+        `Discovery: ${describe(window)} reported ${total} results and returned ${seen.size}${incomplete ? ' (incomplete)' : ''}.`
+      );
     }
   }
 
-  await visit(0, Math.floor(Date.now() / 1000));
+  await visit({ stars: [cutoff] });
+  log(`Discovery: found ${repositories.size} repositories; GitHub reported ${reported}.`);
   return [...repositories.values()].sort((left, right) => left.id - right.id);
 }
 
