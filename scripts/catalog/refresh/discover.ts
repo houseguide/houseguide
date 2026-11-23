@@ -6,6 +6,7 @@ import { type GitHubRequest, githubRequest } from './github.ts';
 export const minimumCutoff = 1000;
 const searchLimit = 1000;
 const pageSize = 100;
+const paginationAttempts = 5;
 
 export interface Repository {
   id: number;
@@ -59,16 +60,25 @@ export async function discoverRepositories(request: GitHubRequest, cutoff = mini
       return;
     }
 
-    const items = [...initial.items];
-    for (let page = 2; page <= Math.ceil(initial.total_count / pageSize); page++) {
-      const result = await search(page);
-      if (result.incomplete_results || result.total_count !== initial.total_count) {
-        throw new Error('GitHub search changed during pagination. Retry the refresh.');
+    // Results are sorted by stars, which change while we paginate, so a page can shift and
+    // repeat or skip a repository. Refetch the whole window until one pass is consistent.
+    let items = initial.items;
+    for (let attempt = 1; ; attempt++) {
+      const first = attempt === 1 ? initial : await search(1);
+      items = [...first.items];
+      const total = first.total_count;
+      let consistent = !first.incomplete_results && total <= searchLimit;
+      for (let page = 2; consistent && page <= Math.ceil(total / pageSize); page++) {
+        const result = await search(page);
+        consistent = !result.incomplete_results && result.total_count === total;
+        items.push(...result.items);
       }
-      items.push(...result.items);
-    }
-    if (new Set(items.map(({ id }) => id)).size !== initial.total_count) {
-      throw new Error('GitHub search returned an incomplete or overlapping page. Retry the refresh.');
+      if (consistent && new Set(items.map(({ id }) => id)).size === total) {
+        break;
+      }
+      if (attempt === paginationAttempts) {
+        throw new Error('GitHub search kept changing during pagination. Retry the refresh.');
+      }
     }
     for (const item of items) {
       if (!item.private && item.stargazers_count >= cutoff) {
