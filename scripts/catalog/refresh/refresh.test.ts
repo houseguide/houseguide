@@ -1,8 +1,9 @@
 import { expect, test } from 'bun:test';
 
 import { discoverRepositories } from './discover.ts';
-import type { GitHubRequest } from './github.ts';
+import { GitHubError, type GitHubRequest } from './github.ts';
 import { findStateArtifact } from './restore.ts';
+import { discoverSources } from './sources.ts';
 
 test('restore selects the newest retained checkpoint even after a failed run', async () => {
   const request: GitHubRequest = async <T>(path: string) => {
@@ -84,4 +85,23 @@ test('discovery reports a search count it cannot reach instead of failing', asyn
   const found = await discoverRepositories(request, 1000, (message) => messages.push(message));
   expect(found).toHaveLength(250);
   expect(messages).toContain('Discovery: stars:>=1000 reported 252 results and returned 250.');
+});
+
+test('source listing skips repositories the token cannot read but fails on a rate limit', async () => {
+  const repositories = [
+    { id: 1, name: 'blocked/org', defaultBranch: 'main', stars: 1000 },
+    { id: 2, name: 'open/repo', defaultBranch: 'main', stars: 1000 }
+  ];
+  const tree = { sha: 'root', truncated: false, tree: [{ path: 'AGENTS.md', type: 'blob', sha: 'blob' }] };
+  const request =
+    (rateLimited: boolean): GitHubRequest =>
+    async <T>(path: string) => {
+      if (path.startsWith('/repos/blocked/')) {
+        throw new GitHubError(403, path, rateLimited);
+      }
+      return tree as T;
+    };
+  const sources = await discoverSources(request(false), repositories);
+  expect(sources.map(({ repository }) => repository)).toEqual(['open/repo']);
+  await expect(discoverSources(request(true), repositories)).rejects.toThrow('HTTP 403');
 });

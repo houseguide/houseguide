@@ -38,6 +38,12 @@ export async function discoverSources(request: GitHubRequest, repositories: Repo
       if (error instanceof GitHubError && (error.status === 404 || error.status === 409)) {
         continue;
       }
+      // Some organizations block the refresh token, and some repositories are legally blocked.
+      // Skip what the token cannot read, but never a rate limit, which would drop sources silently.
+      if (error instanceof GitHubError && (error.status === 403 || error.status === 451) && !error.rateLimited) {
+        console.error(`Sources: skipped ${repository.name} (HTTP ${error.status}).`);
+        continue;
+      }
       throw error;
     }
 

@@ -3,7 +3,8 @@ export type GitHubRequest = <T>(path: string) => Promise<T>;
 export class GitHubError extends Error {
   constructor(
     readonly status: number,
-    path: string
+    path: string,
+    readonly rateLimited = false
   ) {
     super(`GitHub returned HTTP ${status} for ${path.split('?')[0]}.`);
   }
@@ -37,7 +38,11 @@ export function githubRequest(token?: string): GitHubRequest {
             ? 1000 * 2 ** attempt
             : undefined;
       if (attempt === 3 || delay === undefined || !Number.isFinite(delay)) {
-        throw new GitHubError(response.status, url.pathname);
+        throw new GitHubError(
+          response.status,
+          url.pathname,
+          Boolean(retryAfter) || response.headers.get('x-ratelimit-remaining') === '0'
+        );
       }
       await response.body?.cancel();
       await new Promise((resolve) => setTimeout(resolve, Math.max(0, delay) + 1000));
